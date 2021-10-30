@@ -1,0 +1,28 @@
+name: Snapshot CD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '11'
+          cache: 'maven'
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@master
+        with:
+          tools-deps: '1.10.3.986'
+      - name: Run Tests
+        run: clojure -T:build ci :snapshot true
+      - name: Deploy Snapshot
+        run: clojure -T:build deploy :snapshot true
+        env:
+          CLOJARS_PASSWORD: ${{secrets.DEPLOY_TOKEN}}
+          CLOJARS_USERNAME: ${{secrets.DEPLOY_USERNAME}}
