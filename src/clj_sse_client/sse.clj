@@ -2,7 +2,8 @@
   (:require
    [clj-sse-client.body-handler :as h]
    [clj-sse-client.client :as http :refer [noop]]
-   [clj-sse-client.event :as e])
+   [clj-sse-client.event :as e]
+   [clojure.spec.alpha :as s])
   (:import
    (java.util.function BiFunction)
    (java.util.concurrent
@@ -12,6 +13,16 @@
     CompletableFuture)))
 
 (set! *warn-on-reflection* true)
+
+(s/def ::on-complete (s/fspec :args (s/cat :state ::e/state)))
+(s/def ::on-error (s/fspec :args (s/cat :state ::e/state
+                                        :error #(instance? Throwable %))))
+(s/def ::on-next (s/fspec :args (s/cat :effect ::e/message)))
+(s/def ::on-subscribe (s/fspec :args (s/cat :state ::e/state)))
+
+(s/def ::sse-options
+  (s/keys
+   :opt-un [::on-complete ::on-error ::on-next ::on-subscribe]))
 
 (defprotocol ISubscriber
   "A protocol for accessing a subscription from an underlying object."
@@ -74,10 +85,14 @@
            on-next
            on-subscribe]
     :or {on-complete  noop
-         on-error     identity
+         on-error     noop
          on-next      identity
          on-subscribe noop}}]
   (new SSEFlowSubscriber on-complete on-error on-next on-subscribe nil nil))
+
+(s/fdef sse-flow-subscriber
+  :args (s/cat :options ::sse-options)
+  :ret #(instance? SSEFlowSubscriber %))
 
 (defn sse-subscription
   "Initialize a SSE subscription with `client` according to `request` and `opts`.

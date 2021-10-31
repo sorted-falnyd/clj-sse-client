@@ -1,6 +1,7 @@
 (ns clj-sse-client.event
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.spec.alpha :as s]))
 
 (defn parse-int
   [s]
@@ -23,12 +24,16 @@
 
 (defrecord Message [last-event-id type data])
 
+(s/def ::message #(instance? Message %))
+
 (defrecord State [id event data]
   IState
   (-accept [this event]
     (-step event this))
   (-emit [this event]
     (-effect event this)))
+
+(s/def ::state #(instance? State %))
 
 (defrecord Dispatch []
     IStep
