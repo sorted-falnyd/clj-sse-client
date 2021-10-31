@@ -4,7 +4,12 @@
    [clj-sse-client.client :as http :refer [noop]]
    [clj-sse-client.event :as e])
   (:import
-   (java.util.concurrent Flow$Subscriber Flow$Subscription)))
+   (java.util.function BiFunction)
+   (java.util.concurrent
+    Flow$Subscriber
+    Flow$Subscription
+    Executor
+    CompletableFuture)))
 
 (set! *warn-on-reflection* true)
 
@@ -86,18 +91,108 @@
         resp (http/send-async! client request (h/from-line-subscriber subscriber))]
     [resp subscriber]))
 
+(defprotocol IConnection
+  (-connect [this] [this subscription])
+  (-reconnect [this]))
+
+(defn reconnect-callback
+  ^BiFunction [connection attempts max-reconnection-attemps]
+  (reify BiFunction
+    (apply [_ r e]
+      (if (nil? e)
+        (println "Connection complete")
+        (when (< attempts max-reconnection-attemps)
+          (println "Reconnecting")
+          (-reconnect connection))))))
+
+(defn delayed-executor
+  ^Executor [executor delay]
+  (if executor
+    (CompletableFuture/delayedExecutor
+     delay
+     java.util.concurrent.TimeUnit/SECONDS
+     executor)
+    (CompletableFuture/delayedExecutor
+     delay
+     java.util.concurrent.TimeUnit/SECONDS)))
+
+(deftype SSEConnection
+    [client
+     connection-request
+     ^:volatile-mutable subscription
+     options
+     ^:volatile-mutable subscriber
+     ^:volatile-mutable response
+     ^Executor reconnect-executor
+     reconnect?
+     ^:volatile-mutable reconnect-delay
+     ^:volatile-mutable attempts]
+  IConnection
+  (-reconnect [this]
+    (set! attempts (inc attempts))
+    (-connect this))
+  (-connect [this]
+    (-connect this subscription))
+  (-connect [this sub]
+    (set! subscription sub)
+    (let [-subscriber (sse-flow-subscriber subscription)
+          -resp (http/send-async! client connection-request (h/from-line-subscriber -subscriber))
+          reconnect (reconnect-callback this attempts (:max-reconnection-attemps options))]
+      (.handleAsync ^CompletableFuture -resp reconnect (delayed-executor reconnect-executor reconnect-delay))
+      (set! response -resp)
+      (set! subscriber -subscriber)))
+  ISubscriber
+  (-subscription [_] (-subscription subscriber))
+  java.lang.AutoCloseable
+  (close [this] (.cancel ^Flow$Subscription (-subscription this))))
+
+(def default-connection-options
+  {:max-reconnection-attemps 3
+   :reconnect? false
+   :reconnect-delay 20})
+
+(defn sse-connection
+  "Takes HttpClient, connection request subscription specification and connection options.
+  Returns a [[SSEConnection]] which can connect, close and reconnect."
+  [client
+   connection-request
+   subscription
+   options]
+  (let [{:keys [executor reconnect? reconnect-delay]}
+        (merge default-connection-options options)]
+    (new
+     SSEConnection
+     client
+     connection-request
+     subscription
+     options
+     nil
+     nil
+     executor
+     reconnect?
+     reconnect-delay
+     0)))
+
+(defn connect
+  "Initiated a SSE connection.
+  Optionally takes SSE options which override the existing options.
+  This allows referring to the connection object in the callbacks."
+  ([connection]
+   (-connect connection))
+  ([connection sse-options]
+   (-connect connection sse-options)))
+
 (comment
-  (def -client (http/client))
-  (def -req (http/request {:uri "http://localhost:8005/lowfreq"
-                           :headers {}
-                           :method :get}))
+  (def client (http/client))
+  (def req (http/request {:uri "http://localhost:8005/lowfreq"
+                          :headers {}
+                          :method :get}))
   (def opts {:on-complete (fn [state] (println "Subscription completed with state:" state))
              :on-error (fn [state ^Throwable t] (println "Error with state:" state t))
              :on-next (fn [eff] (doto eff println))
              :on-subscribe (fn [state] (println "Initializing subscription with state:" state))})
-  (def -sub (sse-subscription -client -req opts))
-  (def resp (first -sub))
-  (def subscriber (second -sub))
-  (def subscription (http/-subscription subscriber))
-  (.cancel subscription))
+  (def conn (sse-connection client req opts {:reconnect? true}))
+  (connect conn)
+
+  (.close conn))
 

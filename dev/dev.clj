@@ -19,6 +19,6 @@
    :on-next (fn [eff] (doto eff println))
    :on-subscribe (fn [state] (println "Initializing subscription with state:" state))})
 
-(def sub (sse/sse-subscription client request opts))
-
-(.cancel (sse/-subscription (second sub)))
+(def conn (sse/sse-connection client request opts {:reconnect? true}))
+(sse/connect conn)
+(.close conn)
