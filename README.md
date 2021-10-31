@@ -7,6 +7,8 @@ No dependency, specification compliant SSE client in Clojure
 
 https://html.spec.whatwg.org/multipage/server-sent-events.html
 
+Status: alpha, but works
+
 ## Usage
 
 ```clojure
@@ -70,6 +72,11 @@ variables (requires the `ci` task be run first):
     $ clojure -T:build deploy
 
 The library will be deployed to io.github.sorted-falnyd/clj-sse-client on clojars.org by default.
+
+## TODO
+
+- [ ] Reconnect flow
+- [ ] Handle retry messages
 
 ## License
 
