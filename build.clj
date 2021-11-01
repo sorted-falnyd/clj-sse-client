@@ -4,33 +4,33 @@
             [org.corfield.build :as bb]))
 
 (def lib 'io.github.sorted-falnyd/clj-sse-client)
-(def version (format "0.0.%s" (b/git-count-revs nil)))
+(defn -version [x] (format "0.0.%s" x))
 
-(defn snapshot
-  [opts]
-  (if (:snapshot opts)
-    (assoc opts :version (str version "-SNAPSHOT"))
-    opts))
+(defn ->opts
+  [{:keys [snapshot] :as opts}]
+  (let [revs (b/git-count-revs nil)
+        version (cond-> (-version revs) snapshot (str "-SNAPSHOT"))]
+    (-> opts
+        (assoc :lib lib)
+        (assoc :version version)
+        (doto (->> (println "Running with opts:"))))))
 
 (defn test "Run the tests." [opts]
   (bb/run-tests opts))
 
 (defn ci "Run the CI pipeline of tests (and build the JAR)." [opts]
   (-> opts
-      (assoc :lib lib :version version)
-      snapshot
+      ->opts
       (bb/run-tests)
       (bb/clean)
       (bb/jar)))
 
 (defn install "Install the JAR locally." [opts]
   (-> opts
-      (assoc :lib lib :version version)
-      snapshot
+      ->opts
       (bb/install)))
 
 (defn deploy "Deploy the JAR to Clojars." [opts]
   (-> opts
-      (assoc :lib lib :version version)
-      snapshot
+      ->opts
       (bb/deploy)))
