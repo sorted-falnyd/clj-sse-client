@@ -169,6 +169,7 @@
 (s/def ::method #{:get :GET :put :PUT :post :POST :delete :DELETE})
 
 (s/def ::uri ::u/uri-able)
+(s/def ::port pos-int?)
 
 (s/def ::timeout ::u/duration-able)
 
