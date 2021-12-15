@@ -15,6 +15,7 @@
     HttpClient
     HttpClient$Version
     HttpClient$Redirect
+    HttpResponse
     HttpRequest
     HttpRequest$Builder
     HttpRequest$BodyPublisher
@@ -220,3 +221,6 @@
   (^CompletableFuture [^HttpClient client request ^HttpResponse$BodyHandler handler]
    (.sendAsync client (-request request) handler)))
 
+(defn failed?
+  ^Boolean [^HttpResponse response]
+  (<= 400 (.statusCode response)))
