@@ -130,6 +130,8 @@
   ([_a _a])
   ([_a _a _a]))
 
+(s/def ::client #(instance? HttpClient %))
+
 (defn client
   "Create a HttpClient with provided settings or with default settings if
   non are provided."
