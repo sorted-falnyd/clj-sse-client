@@ -59,7 +59,7 @@
     :path #(instance? Path %)
     :File #(instance? File %)
     :string #(instance? String %))
-   #(try (-uri %) (catch Exception _))))
+   #(try (-uri (val %)) (catch Exception _))))
 
 (defprotocol IDuration (-duration [this]))
 
