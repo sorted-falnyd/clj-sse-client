@@ -1,7 +1,8 @@
 (ns clj-sse-client.client
   (:require
    [clj-sse-client.util :as u]
-   [clojure.spec.alpha :as s])
+   [clojure.spec.alpha :as s]
+   [clj-sse-client.client :as client])
   (:import
    (java.util.concurrent CompletableFuture)
    (java.net
@@ -20,7 +21,8 @@
     HttpRequest$Builder
     HttpRequest$BodyPublisher
     HttpRequest$BodyPublishers
-    HttpResponse$BodyHandler)))
+    HttpResponse$BodyHandler
+    HttpResponse$BodyHandlers)))
 
 (set! *warn-on-reflection* true)
 
@@ -136,9 +138,10 @@
 (defn client
   "Create a HttpClient with provided settings or with default settings if
   non are provided."
-  ([]
+  (^HttpClient []
    (HttpClient/newHttpClient))
-  ([{:keys [authenticator
+  (^HttpClient
+   [{:keys [authenticator
             connect-timeout
             cookie-handler
             executor
@@ -213,13 +216,40 @@
   java.util.Map
   (-request [this] (request this)))
 
-(defn send!
-  [^HttpClient client request ^HttpResponse$BodyHandler handler]
-  (.send client (-request request) handler))
+(defprotocol IHttpClient
+  (-send! [client request] [client request handler]))
 
-(defn send-async!
-  (^CompletableFuture [^HttpClient client request ^HttpResponse$BodyHandler handler]
-   (.sendAsync client (-request request) handler)))
+(extend-protocol IHttpClient
+  HttpClient
+  (-send! [client request]
+    (.sendAsync
+     client
+     (-request request)
+     (HttpResponse$BodyHandlers/ofByteArray)))
+  (-send! [client request handler]
+    (.sendAsync client (-request request) handler)))
+
+(defn create
+  ([] (create nil))
+  ([opts]
+   (let [client (client opts)]
+     (reify IHttpClient
+       (-send! [_ request]
+         (.sendAsync client request (HttpResponse$BodyHandlers/ofByteArray)))
+       (-send! [_ request handler]
+         (.sendAsync client request handler))))))
+
+(defn send!
+  (^CompletableFuture [client request]
+   (send! client (-request request) (HttpResponse$BodyHandlers/ofByteArray)))
+  (^CompletableFuture [client request handler]
+   (-send! client (-request request) handler)))
+
+(defn send-sync!
+  ([client request]
+   (send-sync! client request (HttpResponse$BodyHandlers/ofByteArray)))
+  ([client request handler]
+   (.get (send! client request handler))))
 
 (defn failed?
   ^Boolean [^HttpResponse response]

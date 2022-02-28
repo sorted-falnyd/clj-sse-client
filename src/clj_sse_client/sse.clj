@@ -103,7 +103,7 @@
   don't block a thread waiting for completion."
   [client request opts]
   (let [subscriber (sse-flow-subscriber opts)
-        resp (http/send-async! client request (h/from-line-subscriber subscriber))]
+        resp (http/send! client request (h/from-line-subscriber subscriber))]
     [resp subscriber]))
 
 (defprotocol IConnection
@@ -151,7 +151,7 @@
   (-connect [this sub]
     (set! subscription sub)
     (let [-subscriber (sse-flow-subscriber subscription)
-          -resp (http/send-async! client connection-request (h/from-line-subscriber -subscriber))
+          -resp (http/send! client connection-request (h/from-line-subscriber -subscriber))
           reconnect (reconnect-callback this attempts (:max-reconnection-attemps options))]
       (.handleAsync ^CompletableFuture -resp reconnect (delayed-executor reconnect-executor reconnect-delay))
       (set! response -resp)
