@@ -1,8 +1,7 @@
 (ns clj-sse-client.client
   (:require
    [clj-sse-client.util :as u]
-   [clojure.spec.alpha :as s]
-   [clj-sse-client.client :as client])
+   [clojure.spec.alpha :as s])
   (:import
    (java.util.concurrent CompletableFuture)
    (java.net
@@ -21,7 +20,6 @@
     HttpRequest$Builder
     HttpRequest$BodyPublisher
     HttpRequest$BodyPublishers
-    HttpResponse$BodyHandler
     HttpResponse$BodyHandlers)))
 
 (set! *warn-on-reflection* true)
